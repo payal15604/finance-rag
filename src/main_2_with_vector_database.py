@@ -651,93 +651,58 @@ class FinanceRAGSystem:
             logging.error(f"Search failed: {e}")
             return []
     
-    # def save_system(self, filepath: str):
-    #     """Save the entire RAG system to disk"""
-    #     try:
-    #         dirpath = os.path.dirname(filepath)
-    #         if dirpath:
-    #             os.makedirs(dirpath, exist_ok=True)
-    #         save_data = {
-    #             'chunks': self.chunks,
-    #             'model_name': self.model_name,
-    #         }
-    #         with open(filepath, 'wb') as f:
-    #             pickle.dump(save_data, f)
-    #         if self.faiss_index:
-    #             faiss_path = filepath.replace('.pkl', '_faiss.index')
-    #             faiss.write_index(self.faiss_index, faiss_path)
-    #         print(f"✅ System saved to {filepath}")
-    #     except Exception as e:
-    #         print(f"❌ Failed to save system: {e}")
-    #         logging.error(f"Failed to save system: {e}")
-
-    # @classmethod
-    # def load_system(cls, filepath: str) -> "FinanceRAGSystem":
-    #     """
-    #     Load a system from disk. If missing, return a fresh initialized system.
-    #     Rebuilds FAISS from saved index or from embeddings if needed.
-    #     """
-    #     if not os.path.exists(filepath):
-    #         print(f"⚠️ System file not found at {filepath}. Starting with an empty system.")
-    #         return cls()
-    #     try:
-    #         with open(filepath, 'rb') as f:
-    #             save_data = pickle.load(f)  # dict with chunks + model_name
-    #         system = cls(model_name=save_data.get('model_name', "sentence-transformers/all-MiniLM-L6-v2"))
-    #         system.chunks = save_data.get('chunks', [])
-    #         # Try to load FAISS index; if not there, rebuild from embeddings
-    #         faiss_path = filepath.replace('.pkl', '_faiss.index')
-    #         if os.path.exists(faiss_path) and HAS_FAISS:
-    #             system.faiss_index = faiss.read_index(faiss_path)
-    #             system.chunk_metadata = {i: ch for i, ch in enumerate(system.chunks)}
-    #             print(f"✅ System loaded from {filepath} ({len(system.chunks)} chunks) with FAISS index")
-    #         else:
-    #             if system.chunks and HAS_FAISS:
-    #                 system._rebuild_faiss_index()
-    #                 print(f"✅ System loaded from {filepath} ({len(system.chunks)} chunks) and rebuilt FAISS")
-    #             else:
-    #                 print(f"✅ System loaded from {filepath} ({len(system.chunks)} chunks) (no FAISS available)")
-    #         return system
-    #     except Exception as e:
-    #         print(f"❌ Failed to load system: {e}")
-    #         logging.error(f"Failed to load system: {e}")
-    #         # Fall back to empty system so the process mode can still run
-    #         return cls()
-    
     def save_system(self, filepath: str):
-        """Save the entire FinanceRAGSystem object and its FAISS index."""
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
-
-        # Save the FinanceRAGSystem object itself (includes chunks, model name, etc.)
-        with open(filepath, 'wb') as f:
-            pickle.dump(self, f)
-
-        # Save FAISS index separately (cannot be pickled directly)
-        if self.faiss_index:
-            faiss_path = filepath.replace('.pkl', '_faiss.index')
-            faiss.write_index(self.faiss_index, faiss_path)
-
-        print(f"✅ FinanceRAGSystem saved at {filepath}")
+        """Save the entire RAG system to disk"""
+        try:
+            dirpath = os.path.dirname(filepath)
+            if dirpath:
+                os.makedirs(dirpath, exist_ok=True)
+            save_data = {
+                'chunks': self.chunks,
+                'model_name': self.model_name,
+            }
+            with open(filepath, 'wb') as f:
+                pickle.dump(save_data, f)
+            if self.faiss_index:
+                faiss_path = filepath.replace('.pkl', '_faiss.index')
+                faiss.write_index(self.faiss_index, faiss_path)
+            print(f"✅ System saved to {filepath}")
+        except Exception as e:
+            print(f"❌ Failed to save system: {e}")
+            logging.error(f"Failed to save system: {e}")
 
     @classmethod
-    def load_system(cls, filepath: str):
-        """Load FinanceRAGSystem object and restore FAISS index if available."""
-        with open(filepath, 'rb') as f:
-            system = pickle.load(f)
-
-        if not isinstance(system, cls):
-            raise ValueError(
-                f"❌ The file {filepath} does not contain a FinanceRAGSystem object. "
-                "Did you save it with the old dict-based method?"
-            )
-
-        # Try to restore FAISS index if present
-        faiss_path = filepath.replace('.pkl', '_faiss.index')
-        if os.path.exists(faiss_path):
-            system.faiss_index = faiss.read_index(faiss_path)
-
-        print(f"✅ FinanceRAGSystem loaded from {filepath}")
-        return system
+    def load_system(cls, filepath: str) -> "FinanceRAGSystem":
+        """
+        Load a system from disk. If missing, return a fresh initialized system.
+        Rebuilds FAISS from saved index or from embeddings if needed.
+        """
+        if not os.path.exists(filepath):
+            print(f"⚠️ System file not found at {filepath}. Starting with an empty system.")
+            return cls()
+        try:
+            with open(filepath, 'rb') as f:
+                save_data = pickle.load(f)  # dict with chunks + model_name
+            system = cls(model_name=save_data.get('model_name', "sentence-transformers/all-MiniLM-L6-v2"))
+            system.chunks = save_data.get('chunks', [])
+            # Try to load FAISS index; if not there, rebuild from embeddings
+            faiss_path = filepath.replace('.pkl', '_faiss.index')
+            if os.path.exists(faiss_path) and HAS_FAISS:
+                system.faiss_index = faiss.read_index(faiss_path)
+                system.chunk_metadata = {i: ch for i, ch in enumerate(system.chunks)}
+                print(f"✅ System loaded from {filepath} ({len(system.chunks)} chunks) with FAISS index")
+            else:
+                if system.chunks and HAS_FAISS:
+                    system._rebuild_faiss_index()
+                    print(f"✅ System loaded from {filepath} ({len(system.chunks)} chunks) and rebuilt FAISS")
+                else:
+                    print(f"✅ System loaded from {filepath} ({len(system.chunks)} chunks) (no FAISS available)")
+            return system
+        except Exception as e:
+            print(f"❌ Failed to load system: {e}")
+            logging.error(f"Failed to load system: {e}")
+            # Fall back to empty system so the process mode can still run
+            return cls()
 
 def main():
     """Main execution function"""
