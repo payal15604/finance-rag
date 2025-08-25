@@ -2,30 +2,35 @@
 # File: src/query_interface.py
 
 import os
-import sys
+import pickle
 from typing import List, Dict
-import openai
 from main_2_with_vector_database import FinanceRAGSystem, StockDataProcessor
+from main_2_with_vector_database import DocumentChunk
+
+# ✅ Hugging Face integration
+from transformers import pipeline
 
 class FinanceRAGQuery:
     """Complete Finance RAG Query System"""
     
-    def __init__(self, system_path: str, openai_api_key: str = None):
-        self.rag_system = FinanceRAGSystem()
+    def __init__(self, system_path: str, use_hf: bool = True):
         self.stock_processor = StockDataProcessor()
-        
-        # Load existing system
+
+        # Load FAISS-based RAG system
         if os.path.exists(system_path):
-            self.rag_system.load_system(system_path)
-            print(f"✅ Loaded {len(self.rag_system.chunks)} chunks from system")
+            with open(system_path, "rb") as f:
+                self.rag_system = pickle.load(f)
+            print(f"✅ Loaded FAISS system from {system_path}")
         else:
-            print(f"⚠️ System file not found: {system_path}")
+            raise FileNotFoundError(f"⚠️ System file not found: {system_path}")
         
-        # Setup OpenAI (optional)
-        if openai_api_key:
-            openai.api_key = openai_api_key
+        # Setup LLM (Hugging Face)
+        if use_hf:
+            print("🤗 Using Hugging Face model: google/flan-t5-small")
+            self.llm = pipeline("text2text-generation", model="google/flan-t5-small")
             self.use_llm = True
         else:
+            self.llm = None
             self.use_llm = False
             print("💡 Running without LLM - showing raw retrieved context")
     
@@ -112,7 +117,7 @@ class FinanceRAGQuery:
         return "\n".join(context_parts)
     
     def _generate_llm_answer(self, question: str, context: str) -> str:
-        """Generate answer using OpenAI"""
+        """Generate answer using Hugging Face"""
         
         prompt = f"""You are a financial analyst assistant. Use the provided context from SEC filings and stock data to answer the user's question accurately and concisely.
 
@@ -124,27 +129,22 @@ Question: {question}
 Instructions:
 - Base your answer primarily on the provided context
 - If the context doesn't contain enough information, say so
-- Cite specific sections when relevant (e.g., "According to Tesla's 10-K Item 1A...")
+- Cite specific sections when relevant
 - Be factual and avoid speculation
 - If stock data is provided, incorporate it appropriately
 
 Answer:"""
 
         try:
-            response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=500,
-                temperature=0.3
-            )
-            return response.choices[0].message.content.strip()
+            response = self.llm(prompt, max_new_tokens=300, truncation=True)
+            return response[0]['generated_text']
         except Exception as e:
             return f"Error generating LLM response: {str(e)}"
 
-def interactive_session(system_path: str, openai_key: str = None):
+def interactive_session(system_path: str, use_hf: bool = True):
     """Run interactive query session"""
     
-    query_system = FinanceRAGQuery(system_path, openai_key)
+    query_system = FinanceRAGQuery(system_path, use_hf)
     
     print("\n" + "="*60)
     print("🏦 Finance RAG Query System")
@@ -199,8 +199,7 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="Finance RAG Query Interface")
     parser.add_argument("--system_path", default="../models/finance_rag_system.pkl",
-                       help="Path to the RAG system file")
-    parser.add_argument("--openai_key", help="OpenAI API key for LLM responses")
+                       help="Path to the FAISS system file")
     parser.add_argument("--interactive", action="store_true", 
                        help="Run interactive session")
     parser.add_argument("--test", action="store_true",
@@ -209,9 +208,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     if args.interactive:
-        interactive_session(args.system_path, args.openai_key)
+        interactive_session(args.system_path)
     elif args.test:
-        query_system = FinanceRAGQuery(args.system_path, args.openai_key)
+        query_system = FinanceRAGQuery(args.system_path)
         for question in example_queries():
             print(f"\n{'='*60}")
             result = query_system.query(question)
